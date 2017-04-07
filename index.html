@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Project</title>
+    <script src="https://d3js.org/d3.v3.js"></script>
+    <style>
+        body {
+            background: #eee;
+        }
+        
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: black;
+            shape-rendering: auto;
+        }
+        
+        .axis text {
+            font-size: 12px;
+            fill: black;
+        }
+        
+        #tooltip {
+            position: absolute;
+            left: 20px;
+            top: 100px;
+            background: #fff;
+            width: 150px;
+            height: auto;
+            padding: 0px 10px;
+            border-radius: 5px;
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        #tooltip.hidden {
+            display: none;
+        }
+        
+        g.arcm {
+            position: absolute;
+            left: 20px;
+            top: 100px;
+            background: black;
+            width: 100px;
+            height: auto;
+            padding: 0px 10px;
+            border-radius: 5px;
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        g.arcm,
+        g.arcf text {
+            fill: #696969;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="tooltip" class="hidden">
+        <p><strong id="bmi">Hello</strong></p>
+        <p id="year">1</p>
+        <p id="per">2</p>
+    </div>
+
+
+    <script>
+        var w = 900;
+        var h = 600;
+        var padding = 60;
+
+        svg();
+
+        d3.csv("bmi03.csv", mid, function(dataSet) {
+
+            bind(dataSet);
+            render(dataSet);
+        });
+
+        function mid(d) {
+            d.per = +d.per;
+            d.year = +d.year;
+            return d;
+        }
+
+        function svg() {
+            d3.select("body")
+                .append("svg")
+                .attr({
+                    width: w,
+                    height: h
+                });
+
+            d3.select("svg")
+                .append("g")
+                .append("rect")
+                .attr({
+                    width: "100%",
+                    height: "100%",
+                    fill: "#E0FFFF"
+                });
+
+            d3.select("svg")
+                .append("g")
+                .classed("axis", true)
+                .attr("id", "axisX");
+
+            d3.select("svg")
+                .append("g")
+                .classed("axis", true)
+                .attr("id", "axisY");
+        }
+
+        function bind(dataSet) {
+
+            var data = fdata(dataSet);
+            var ldata = linedata(dataSet);
+
+            var selection = d3.select("svg")
+                .selectAll("g.line")
+                .data(ldata);
+            var s = selection.enter().append("g").attr("class", "line");
+            s.append("path").classed("ll", true);
+            selection.exit().remove();
+
+
+            var sel = d3.select("svg")
+                .selectAll("circle")
+                .data(data);
+            sel.enter().append("circle");
+            sel.exit().remove();
+        }
+
+
+        function fdata(dataSet) {
+            var data = dataSet.filter(function(d) {
+                return d.gender == "合計";
+            });
+            return data;
+        }
+
+        function linedata(dataSet) {
+            var data = dataSet.filter(function(d) {
+                return d.gender == "合計";
+            });
+            var ldata = d3.nest().key(function(d) {
+                return d.BMI;
+            }).entries(data);
+            return ldata;
+        }
+
+        function render(dataSet) {
+
+            var xScale = d3.scale.linear()
+                .domain([2008, 2014])
+                .range([padding, w - padding]);
+
+            var yScale = d3.scale.linear()
+                .domain([0, 70])
+                .range([h - padding, padding]);
+
+            var fScale = d3.scale.category10();
+
+            var xAxis = d3.svg.axis()
+                .scale(xScale)
+                .orient("bottom")
+                .ticks(8);
+
+            var yAxis = d3.svg.axis()
+                .scale(yScale)
+                .orient("left");
+
+            var linePath = d3.svg.line()
+                .x(function(d) {
+                    return xScale(d.year);
+                })
+                .y(function(d) {
+                    return yScale(d.per);
+                })
+                .interpolate('linear')
+                .tension(1);
+
+
+            d3.selectAll(".ll")
+                .transition()
+                .ease("elastic")
+                .duration(5000)
+                .delay(function(d, j) {
+                    return 200 * j;
+                })
+                .attr({
+                    "d": function(d) {
+                        return linePath(d.values);
+                    },
+                    "fill": function(d) {
+                        return "none";
+                    },
+                    "stroke": function(d, i) {
+                        return fScale(i);
+                    },
+                    "stroke-width": 3
+                });
+
+            d3.selectAll("circle")
+                .transition()
+                .ease("elastic")
+                .delay(function(d, j) {
+                    return 150 * j;
+                })
+                .attr({
+                    cx: function(d) {
+                        return xScale(d.year);
+                    },
+                    cy: function(d) {
+                        return yScale(d.per);
+                    },
+                    r: 10,
+                    fill: "#800080"
+                });
+
+
+            d3.select("svg>#axisX")
+                .attr("transform", "translate(0," + (h - padding + 10) + ")")
+                .call(xAxis);
+
+            d3.select("svg>#axisY")
+                .attr("transform", "translate(" + (padding - 10) + ",0)")
+                .call(yAxis);
+
+
+            d3.selectAll("circle")
+                .on("mouseover", function(d) {
+                    var posX = d3.select(this).attr("cx");
+                    var posY = d3.select(this).attr("cy");
+
+                    var tooltip = d3.select("#tooltip")
+                        .style({
+                            "left": (+posX + 20) + "px",
+                            "top": (+posY + 20) + "px"
+                        });
+                    tooltip.select("#bmi").text("BMI：　" + d.BMI);
+                    tooltip.select("#year").text("年度：　" + d.year);
+                    tooltip.select("#per").text("百分比：　" + d.per + "%");
+                    tooltip.classed("hidden", false);
+                })
+                .on("mouseout", function(d) {
+                    d3.select("#tooltip").classed("hidden", true);
+                })
+                .on("click", function(d) {
+                    var n = [];
+                    n.push(d.year);
+                    male(n);
+                    female(n);
+                });
+        }
+
+        function female(dit) {
+            d3.csv("bmi03.csv", mid, function(dataSet) {
+
+                var fDataSet = dataSet.filter(function(d) {
+                    return d.year === dit[0] && d.gender === "女性";
+                });
+
+                var pie = d3.layout.pie()
+                    .value(function(d) {
+                        return d.per;
+                    });
+
+                var arcdata = pie(fDataSet);
+
+                var selection = d3.select("svg")
+                    .selectAll("g.arcf")
+                    .data(arcdata);
+                var g_arc = selection.enter()
+                    .append("g")
+                    .attr("class", "arcf");
+                g_arc.append("path").classed("fp", true);
+                g_arc.append("text");
+                selection.exit().remove();
+
+                var outerR = 60;
+                var innerR = 0;
+                var arc = d3.svg.arc()
+                    .outerRadius(outerR)
+                    .innerRadius(innerR);
+                var fScale = d3.scale.category20();
+
+                d3.selectAll("g.arcf")
+                    .transition()
+                    .duration(1000)
+                    .ease("bounce")
+                    .delay(function(d, j) {
+                        return 200 * j;
+                    })
+                    .attr("transform", "translate(" + (w / 1.6) + "," + (h / 7) + ")")
+                    .select(".fp")
+                    .attr("d", function(d) {
+                        return arc(d);
+                    })
+                    .style("fill", function(d, i) {
+                        return fScale(i);
+                    });
+
+                d3.selectAll("g.arcf")
+                    .select("text")
+                    .attr("transform", function(d) {
+                        var x = arc.centroid(d)[0] * 2.3;
+                        var y = arc.centroid(d)[1] * 2.4;
+                        return "translate(" + x + "," + y + ")";
+                        // return "translate(" + arc.centroid(d) + ")";
+                    }) //arc.centroid 計算並回傳此元素中心位置(重心)
+                    .attr("text-anchor", "middle")
+                    .text(function(d) {
+                        return d.data.gender + ":" + d.data.BMI + " " + d.data.per + "%";
+                    })
+            });
+        }
+
+        function male(dit) {
+            d3.csv("bmi03.csv", mid, function(dataSet) {
+
+                var fDataSet = dataSet.filter(function(d) {
+                    return d.year === dit[0] && d.gender === "男性";
+                });
+
+                var pie = d3.layout.pie()
+                    .startAngle(Math.PI * 0)
+                    .endAngle(Math.PI * 2)
+                    .value(function(d) {
+                        return d.per;
+                    });
+
+                var arcdata = pie(fDataSet);
+
+                var selection = d3.select("svg")
+                    .selectAll("g.arcm")
+                    .data(arcdata);
+                var g_arc = selection.enter()
+                    .append("g")
+                    .attr("class", "arcm");
+                g_arc.append("path").classed("mp", true);
+                g_arc.append("text");
+                selection.exit().remove();
+
+                var outerR = 60;
+                var innerR = 0;
+                var arc = d3.svg.arc()
+                    .outerRadius(outerR)
+                    .innerRadius(innerR);
+                var fScale = d3.scale.category20();
+
+
+                d3.selectAll("g.arcm")
+                    .transition()
+                    .duration(1000)
+                    .ease("bounce")
+                    .delay(function(d, j) {
+                        return 200 * j;
+                    })
+                    .attr("transform", "translate(" + (w / 1.2) + "," + (h / 7) + ")")
+                    .select(".mp")
+                    .attr("d", function(d) {
+                        return arc(d);
+                    })
+                    .style("fill", function(d, i) {
+                        return fScale(i);
+                    });
+
+                // d3.select("g.arcm").transition().tween("animation", function() {
+                //     var node = d3.select(this);
+                //     return function(progress) { /* 傳回我們的客製內插函式 */
+                //         node.attr({
+                //             d: function(progress) {
+                //                 return arc.startAngle(0).endAngle(progress * Math.PI * 2);
+                //             }
+                //         });
+                //     };
+                // });
+
+                d3.selectAll("g.arcm")
+                    .select("text")
+                    .attr("transform", function(d) {
+                        var x = arc.centroid(d)[0] * 2.3;
+                        var y = arc.centroid(d)[1] * 2.4;
+                        return "translate(" + x + "," + y + ")";
+                        // return "translate(" + arc.centroid(d) + ")";
+                    }) //arc.centroid 計算並回傳此元素中心位置(重心)
+                    .attr("text-anchor", "middle")
+                    .text(function(d) {
+                        return d.data.gender + ":" + d.data.BMI + " " + d.data.per + "%";
+                    })
+            });
+        }
+    </script>
+</body>
+
+</html>
